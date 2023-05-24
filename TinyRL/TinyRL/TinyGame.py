@@ -19,8 +19,8 @@ class Buffer():
 
 
 class simplEnv():
-    metadata = {"render_fps": 4}
-    def __init__(self,num_envs,siz,buffer_len):
+    metadata = {"render_modes": ["pygame"], "render_fps": 4}
+    def __init__(self, num_envs, siz, buffer_len, render_mode = None, window_size = 512, font_size=36):
         self.num_envs = num_envs
         self.siz = siz
         self.buffer_len = buffer_len
@@ -47,14 +47,19 @@ class simplEnv():
         self.fill()
         
         # Pygames Stuff
-        pygame.init()
-        pygame.display.init()
-        self.font = pygame.font.SysFont("Arial", 36)
-        self.board_size = self.siz
-        self.window_size = 512
-        self.window = pygame.display.set_mode((self.window_size, self.window_size))        
-        self.clock = pygame.time.Clock()
-        self.action_ascii = ['↙','↓','↘','←','♬','→','↖','↑','↗']
+        assert render_mode is None or render_mode in self.metadata["render_modes"]
+        self.render_mode = render_mode
+        self.window = None      
+        self.clock = None     
+        if(self.render_mode == "pygame"):
+            pygame.init()
+            pygame.display.init()
+            self.font = pygame.font.SysFont("Arial", font_size)
+            self.board_size = self.siz
+            self.window_size = window_size
+            self.window = pygame.display.set_mode((self.window_size, self.window_size))        
+            self.clock = pygame.time.Clock()
+            self.action_ascii = ['↙','↓','↘','←','♬','→','↖','↑','↗']
 
 
 
@@ -74,6 +79,9 @@ class simplEnv():
             self.buffer.a[0:self.num_envs,] = actions
             
             acts = torch.matmul(torch.nn.functional.one_hot(actions, num_classes = self.num_actions)*1.0, self.action_table)
+            # print('???')
+            # print(actions)
+            # print(acts)
             
             self.states =  self.states + torch.concat([torch.reshape(acts,[self.num_envs,2]),torch.zeros([self.num_envs,2])],1)
             self.states = torch.clip(self.states,0,self.siz-1)
@@ -102,16 +110,17 @@ class simplEnv():
         self.states[self.reset_idx,:] = torch.randint(0,self.siz,[num_resets,4])*1.0  
     
     def render(self, env_id, action_map=None):
-        self.render_world(env_id)
-        if(action_map.any() != None):
-            self.render_actions(action_map)
-            
-        pygame.event.pump()
-        pygame.display.update()
-
-        # We need to ensure that human-rendering occurs at the predefined framerate.
-        # The following line will automatically add a delay to keep the framerate stable.
-        self.clock.tick(self.metadata["render_fps"])
+        if(self.render_mode == "pygame"):
+            self.render_world(env_id)
+            if(action_map.any() != None):
+                self.render_actions(action_map)
+                
+            pygame.event.pump()
+            pygame.display.update()
+    
+            # We need to ensure that human-rendering occurs at the predefined framerate.
+            # The following line will automatically add a delay to keep the framerate stable.
+            self.clock.tick(self.metadata["render_fps"])
             
     def render_world(self, env_id):
         canvas = pygame.Surface((self.window_size, self.window_size))
@@ -203,7 +212,7 @@ class simplEnv():
                 action_img = self.action_ascii[action_map[x,y]]
                 txtsurf = self.font.render(action_img, True, (0,0,0))
                 # self.window.blit(txtsurf,(self.window_size - txtsurf.get_width() // 2, self.window_size - txtsurf.get_height() // 2))
-                self.window.blit(txtsurf,(pix_square_size*y+offset, pix_square_size*x+offset))
+                self.window.blit(txtsurf,(pix_square_size*x+offset, pix_square_size*y+offset))
 
 
 

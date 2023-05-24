@@ -8,13 +8,13 @@ Created on Mon May 22 20:06:31 2023
 import torch
 import TinyGame
 
-buffer_len = 100;
-num_envs = 10
-siz = 11
-gamma = 1.0
-epsi = 0.0
-num_epochs = 1000
-num_q_holds = 1
+buffer_len = 100000;
+num_envs = 10000
+siz = 25
+gamma = 0.8
+epsi = 0.8
+num_epochs = 2000
+num_q_holds = 10
 torch.set_default_device('cuda')
 
 #%%
@@ -23,9 +23,11 @@ class Q_nn(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.linear_relu_stack = torch.nn.Sequential(
-            torch.nn.Linear(4, 16),
+            torch.nn.Linear(4, 64),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(16, 9),
+            torch.nn.Linear(64, 64),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(64, 9),
 
            
         )
@@ -36,7 +38,7 @@ class Q_nn(torch.nn.Module):
     
 #%%
 
-env = TinyGame.simplEnv(num_envs,siz,buffer_len)
+env = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode=None)
 net1 = Q_nn()
 optimizer = torch.optim.Adam(net1.parameters(), lr=1e-3)
 
@@ -88,10 +90,10 @@ for epoch in range(num_epochs):
     a = torch.linspace(0,env.siz-1,env.siz)
     grid = torch.meshgrid(a,a)
     grid_coords = torch.concat([grid[0].reshape([-1,1]),grid[1].reshape([-1,1])],1)
-    goal_coord =torch.tensor([[(env.siz-1)/2 ,(env.siz-1)/2]])
+    goal_coord = torch.unsqueeze(env.states[0,2:4],0)
     sample_states = torch.concat([grid_coords,goal_coord*torch.ones([env.siz**2,1])],1)
     sample_obs = sample_states*2./(env.siz-1.)-1.
-    Qvals = net1(sample_states)
+    Qvals = net1(sample_obs)
     MaxQ = torch.max(Qvals,dim=1)
     action_world = MaxQ[1].reshape(env.siz,env.siz).cpu().numpy()
     
@@ -101,45 +103,49 @@ for epoch in range(num_epochs):
         
 
 #%%
-view_len = 10
-history = torch.zeros(view_len,env.siz,env.siz)
+import time
 
-env = TinyGame.simplEnv(num_envs,siz,buffer_len)
+view_len = 1000
 
+env_render = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode="pygame", window_size = 1024, font_size = 12)
+env_view_id = 0
 for i in range(view_len):
+    a = torch.linspace(0,env_render.siz-1,env_render.siz)
+    grid = torch.meshgrid(a,a)
+    grid_coords = torch.concat([grid[0].reshape([-1,1]),grid[1].reshape([-1,1])],1)
+    goal_coord = torch.unsqueeze(env_render.states[env_view_id,2:4],0)
+    sample_states = torch.concat([grid_coords,goal_coord*torch.ones([env_render.siz**2,1])],1)
+    sample_obs = sample_states*2./(env_render.siz-1.)-1.
+    Qvals = net1(sample_obs)
+    MaxQ = torch.max(Qvals,dim=1)
     
-    history[i,env.states[0,0].int(),env.states[0,1].int()] = 1.0;
-    history[i,env.states[0,2].int(),env.states[0,3].int()] = -1.0;
+    action_world = MaxQ[1].reshape(env_render.siz,env_render.siz).cpu().numpy()
+    env_render.render(env_view_id, action_world)
     
-    obs = env.states*2./(env.siz-1.)-1.
+
+    obs = env_render.states*2./(env_render.siz-1.)-1.
+    Q_vals = net1(obs)
     
-    Q_vals = net1(env.states)
-    
-    # print(env.states[0])
+    # print(env_render.states[0])
     
     maxQ = torch.max(Q_vals,dim=1)
     actions = maxQ[1]
 
-    a = torch.linspace(0,env.siz-1,env.siz)
-    grid = torch.meshgrid(a,a)
-    grid_coords = torch.concat([grid[0].reshape([-1,1]),grid[1].reshape([-1,1])],1)
-    goal_coord =torch.tensor([[(env.siz-1)/2 ,(env.siz-1)/2]])
-    sample_states = torch.concat([grid_coords,goal_coord*torch.ones([env.siz**2,1])],1)
-    sample_obs = sample_states*2./(env.siz-1.)-1.
-    Qvals = net1(sample_states)
-    MaxQ = torch.max(Qvals,dim=1)
+    print('-----')
+    print(env_render.states[env_view_id,...])
+    print('numpad action : {}'.format(actions[env_view_id].detach().cpu().numpy()+1))
+    env_render.update(actions)
+    print(env_render.states[env_view_id,...])
     
-    action_world = MaxQ[1].reshape(env.siz,env.siz).cpu().numpy()
+    print('.......')
+    print(obs[0,...])
+    print(actions)
+    print()
     
-    print(action_world+1)
-    env.render(0, action_world)
-    
-    env.update(actions)
 
+    # time.sleep(1)
+""
     # print(actions[0])
 
-env.close()
+# env_render.close()
     
-    
-history_cpu = history.cpu()
-history_np = history_cpu.numpy()
