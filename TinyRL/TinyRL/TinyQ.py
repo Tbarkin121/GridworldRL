@@ -91,17 +91,17 @@ for epoch in range(num_epochs):
     goal_coord =torch.tensor([[(env.siz-1)/2 ,(env.siz-1)/2]])
     sample_states = torch.concat([grid_coords,goal_coord*torch.ones([env.siz**2,1])],1)
     sample_obs = sample_states*2./(env.siz-1.)-1.
-    Qvals = net(sample_states)
+    Qvals = net1(sample_states)
     MaxQ = torch.max(Qvals,dim=1)
-    action_world = MaxQ[1].reshape(env.siz,env.siz).cpu().numpy() +1
+    action_world = MaxQ[1].reshape(env.siz,env.siz).cpu().numpy()
     
-    print(action_world)
+    # print(action_world)
     
     print(epoch,loss.detach().cpu().numpy(),torch.mean(maxQ[0]).detach().cpu().numpy())
         
 
 #%%
-view_len = 100
+view_len = 10
 history = torch.zeros(view_len,env.siz,env.siz)
 
 env = TinyGame.simplEnv(num_envs,siz,buffer_len)
@@ -113,13 +113,33 @@ for i in range(view_len):
     
     obs = env.states*2./(env.siz-1.)-1.
     
-    Q_vals = net(env.states)
+    Q_vals = net1(env.states)
     
     # print(env.states[0])
     
     maxQ = torch.max(Q_vals,dim=1)
     actions = maxQ[1]
+
+    a = torch.linspace(0,env.siz-1,env.siz)
+    grid = torch.meshgrid(a,a)
+    grid_coords = torch.concat([grid[0].reshape([-1,1]),grid[1].reshape([-1,1])],1)
+    goal_coord =torch.tensor([[(env.siz-1)/2 ,(env.siz-1)/2]])
+    sample_states = torch.concat([grid_coords,goal_coord*torch.ones([env.siz**2,1])],1)
+    sample_obs = sample_states*2./(env.siz-1.)-1.
+    Qvals = net1(sample_states)
+    MaxQ = torch.max(Qvals,dim=1)
+    
+    action_world = MaxQ[1].reshape(env.siz,env.siz).cpu().numpy()
+    
+    print(action_world+1)
+    env.render(0, action_world)
+    
     env.update(actions)
+
     # print(actions[0])
+
+env.close()
+    
+    
 history_cpu = history.cpu()
 history_np = history_cpu.numpy()

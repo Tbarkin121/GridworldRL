@@ -7,7 +7,7 @@ Created on Mon May 22 20:26:04 2023
 
 import torch
 import pygame
-
+import pygame.freetype
 
 class Buffer():
   def __init__(self,buffer_len,num_actions):
@@ -24,15 +24,15 @@ class simplEnv():
         self.num_envs = num_envs
         self.siz = siz
         self.buffer_len = buffer_len
-        self.action_table =  torch.tensor([[1,-1],
-                                            [1, 0],
+        self.action_table =  torch.tensor([[-1, 1],
+                                            [0, 1],
                                             [1, 1],
-                                            [ 0,-1],
-                                            [ 0, 0],
-                                            [ 0, 1],
-                                            [ -1,-1],
-                                            [ -1, 0],
-                                            [ -1, 1]])*1.0
+                                            [-1, 0],
+                                            [0, 0],
+                                            [1, 0],
+                                            [-1, -1],
+                                            [0, -1],
+                                            [1, -1]])*1.0
         
         # self.action_table =  torch.tensor([[-1, 0],
         #                                    [ 0,-1],
@@ -47,10 +47,16 @@ class simplEnv():
         self.fill()
         
         # Pygames Stuff
+        pygame.init()
+        pygame.display.init()
+        self.font = pygame.font.SysFont("Arial", 36)
         self.board_size = self.siz
         self.window_size = 512
-        self.window = None
-        self.clock = None
+        self.window = pygame.display.set_mode((self.window_size, self.window_size))        
+        self.clock = pygame.time.Clock()
+        self.action_ascii = ['↙','↓','↘','←','♬','→','↖','↑','↗']
+
+
 
         
     def fill(self):
@@ -94,16 +100,20 @@ class simplEnv():
     def reset_env(self):
         num_resets = torch.sum(self.reset_idx)
         self.states[self.reset_idx,:] = torch.randint(0,self.siz,[num_resets,4])*1.0  
-        
-    def render(self, env_id):
-        if self.window is None:
-            pygame.init()
-            pygame.display.init()
-            self.window = pygame.display.set_mode((self.window_size, self.window_size))
+    
+    def render(self, env_id, action_map=None):
+        self.render_world(env_id)
+        if(action_map.any() != None):
+            self.render_actions(action_map)
+            
+        pygame.event.pump()
+        pygame.display.update()
 
-        if self.clock is None:
-            self.clock = pygame.time.Clock()
-
+        # We need to ensure that human-rendering occurs at the predefined framerate.
+        # The following line will automatically add a delay to keep the framerate stable.
+        self.clock.tick(self.metadata["render_fps"])
+            
+    def render_world(self, env_id):
         canvas = pygame.Surface((self.window_size, self.window_size))
         canvas.fill((255, 255, 255))
         pix_square_size = (
@@ -175,15 +185,26 @@ class simplEnv():
                 width=3,
             )
 
-        
         # The following line copies our drawings from `canvas` to the visible window
         self.window.blit(canvas, canvas.get_rect())
-        pygame.event.pump()
-        pygame.display.update()
 
-        # We need to ensure that human-rendering occurs at the predefined framerate.
-        # The following line will automatically add a delay to keep the framerate stable.
-        self.clock.tick(self.metadata["render_fps"])
+        
+    def render_actions(self, action_map):
+        pix_square_size = (
+            self.window_size / self.board_size
+        )  # The size of a single grid square in pixels
+        offset = pix_square_size/6
+
+
+        # The following line copies our drawings from `canvas` to the visible window
+
+        for x in range(self.board_size):
+            for y in range(self.board_size):
+                action_img = self.action_ascii[action_map[x,y]]
+                txtsurf = self.font.render(action_img, True, (0,0,0))
+                # self.window.blit(txtsurf,(self.window_size - txtsurf.get_width() // 2, self.window_size - txtsurf.get_height() // 2))
+                self.window.blit(txtsurf,(pix_square_size*y+offset, pix_square_size*x+offset))
+
 
 
     def close(self):
@@ -197,18 +218,19 @@ class simplEnv():
    
 
 #%%
+# import time
+# num_envs = 1000
+# siz = 11
 
-num_envs = 1000
-siz = 11
+# env = simplEnv(num_envs,siz, 1000)
 
-env = simplEnv(num_envs,siz, 1000)
+# for i in range(100):
+#     actions = torch.randint(0,env.num_actions,[env.num_envs,])
+#     action_map = torch.randint(0,9, (siz, siz)).detach().cpu().numpy()
+#     env.render(0, action_map)
+#     env.update(actions)
+#     env.get_rewards()
+#     env.get_reset_idx()
+#     time.sleep(1)
 
-for i in range(1000):
-    actions = torch.randint(0,env.num_actions,[env.num_envs,])
-    env.update(actions)
-    env.get_rewards()
-    env.get_reset_idx()
-    env.render(0)
-    # env.reset_env()
-
-env.close()
+# env.close()
