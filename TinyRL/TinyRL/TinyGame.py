@@ -100,8 +100,7 @@ class simplEnv():
             
     def get_rewards(self):    
         self.rewards = -1*torch.ones(self.num_envs,)    
-        
-
+                
     def get_reset_idx(self):  
         self.reset_idx = torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0
 
@@ -121,7 +120,16 @@ class simplEnv():
             # We need to ensure that human-rendering occurs at the predefined framerate.
             # The following line will automatically add a delay to keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
-            
+    
+    def get_SARS(self):
+        S1 = self.buffer.s1*2./(self.siz-1.)-1.
+        A1 = self.buffer.a
+        R1 = self.buffer.r*(1.0 - 1.0*self.buffer.d)
+        S2 = self.buffer.s2*2./(self.siz-1.)-1.
+        
+        return S1, A1, R1, S2
+
+
     def render_world(self, env_id):
         canvas = pygame.Surface((self.window_size, self.window_size))
         canvas.fill((255, 255, 255))
