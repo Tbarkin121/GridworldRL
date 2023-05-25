@@ -34,13 +34,11 @@ class simplEnv():
                                             [0, -1],
                                             [1, -1]])*1.0
         
-        # self.action_table =  torch.tensor([[-1, 0],
-        #                                    [ 0,-1],
-        #                                    [ 0, 1],
-        #                                    [ 1, 0]])*1.0
-        
+                
         self.num_actions = self.action_table.shape[0]
         self.states = torch.zeros([self.num_envs,4])
+        self.max_episode_length = 100
+        self.episode_time = torch.zeros([self.num_envs,])
         self.get_reset_idx()
         self.reset_env()
         self.buffer = Buffer(self.buffer_len,self.num_actions)
@@ -79,12 +77,10 @@ class simplEnv():
             self.buffer.a[0:self.num_envs,] = actions
             
             acts = torch.matmul(torch.nn.functional.one_hot(actions, num_classes = self.num_actions)*1.0, self.action_table)
-            # print('???')
-            # print(actions)
-            # print(acts)
             
             self.states =  self.states + torch.concat([torch.reshape(acts,[self.num_envs,2]),torch.zeros([self.num_envs,2])],1)
             self.states = torch.clip(self.states,0,self.siz-1)
+            
             self.get_reset_idx()
             self.get_rewards()
             
@@ -97,16 +93,20 @@ class simplEnv():
             
             
             self.reset_env()
+            self.episode_time[:] = self.episode_time[:] + 1
             
     def get_rewards(self):    
         self.rewards = -1*torch.ones(self.num_envs,)    
                 
-    def get_reset_idx(self):  
-        self.reset_idx = torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0
+    def get_reset_idx(self):
+        goal_reset = torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0
+        timer_reset = self.episode_time > self.max_episode_length
+        self.reset_idx = goal_reset | timer_reset
 
     def reset_env(self):
         num_resets = torch.sum(self.reset_idx)
         self.states[self.reset_idx,:] = torch.randint(0,self.siz,[num_resets,4])*1.0  
+        self.episode_time[self.reset_idx] = torch.zeros([num_resets,])
     
     def render(self, env_id, action_map=None):
         if(self.render_mode == "pygame"):
@@ -122,10 +122,11 @@ class simplEnv():
             self.clock.tick(self.metadata["render_fps"])
     
     def get_SARS(self):
-        S1 = self.buffer.s1*2./(self.siz-1.)-1.
-        A1 = self.buffer.a
-        R1 = self.buffer.r*(1.0 - 1.0*self.buffer.d)
-        S2 = self.buffer.s2*2./(self.siz-1.)-1.
+        with torch.no_grad():
+            S1 = self.buffer.s1*2./(self.siz-1.)-1.
+            A1 = self.buffer.a
+            R1 = self.buffer.r*(1.0 - 1.0*self.buffer.d)
+            S2 = self.buffer.s2*2./(self.siz-1.)-1.
         
         return S1, A1, R1, S2
 
