@@ -8,14 +8,17 @@ Created on Mon May 22 20:06:31 2023
 import torch
 import TinyGame
 
-buffer_len = 100000;
+buffer_len = 100000; #10k environments, but store 100k state transitions in buffer. 
+#Can re-operate on old data since its saved, is like the last ten time steps of data in this case
+#Experience replay buffer
+#predicted reward across the buffer means: 
 num_envs = 10000
-siz = 51
-gamma = 0.95
-epsi = 0.8
-num_epochs = 20000
-num_q_holds = 10
-num_inner_steps = 10
+siz = 11
+gamma = 0.7
+epsi = 0.7
+num_epochs = 100
+num_q_holds = 1
+num_inner_steps = 100
 torch.set_default_device('cuda')
 
 #%%
@@ -26,9 +29,9 @@ class Q_nn(torch.nn.Module):
         self.linear_relu_stack = torch.nn.Sequential(
             torch.nn.Linear(4, 128),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(128, 64),
+            torch.nn.Linear(128, 128),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(64, 9),
+            torch.nn.Linear(128, 9),
 
            
         )
@@ -48,7 +51,7 @@ net2.eval()
 
 #%%
 
-env = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode=None, window_size = 1024, font_size = 12)
+env = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode='pygame', window_size = 1024, font_size = 24)
 # env = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode="pygame", window_size = 1024, font_size = 12)
 
 for epoch in range(num_epochs):
@@ -103,7 +106,7 @@ import time
 None
 view_len = 1000
 
-env_render = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode="pygame", window_size = 1024, font_size = 12)
+env_render = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode="pygame", window_size = 1024, font_size = 24)
 env_view_id = 0
 for i in range(view_len):
     a = torch.linspace(0,env_render.siz-1,env_render.siz)
