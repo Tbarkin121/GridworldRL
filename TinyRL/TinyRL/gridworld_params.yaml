@@ -1,0 +1,22 @@
+# used to create the object
+name: GridWorld
+
+env:
+  device: 'cuda'
+  board_size: 51  # Square Grid
+
+
+
+train_param:
+  num_envs: 10000
+  buffer_len: 100000
+  gamma: 0.9
+  epsi: 0.7
+  num_epochs: 200
+  num_q_holds: 1
+  num_inner_steps: 100
+  learning_rate: 0.001
+
+debug:
+  env_view_id: 0
+

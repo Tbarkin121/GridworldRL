@@ -3,17 +3,25 @@ from gym import spaces
 import pygame
 import torch
 import numpy as np
+import yaml
 
 class GridWorldEnv():
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
     def __init__(self, render_mode=None, size=10):
-        self.device = 'cuda'
-        self.size = size  # Square Grid
-        self.num_envs = 10
-        self.num_features = 4
-        self.num_apples = 10
-        self.apple_prob = 0.1
-        self.fire_prob = 0.05
+        with open("gridworld_params.yaml", "r") as cfg:
+            try:
+                self.cfg = yaml.safe_load(cfg)
+            except yaml.YAMLError as exc:
+                print(exc)
+        print(self.cfg)
+
+        self.device = self.cfg["env"]["device"]
+        self.size = self.cfg["env"]["board_size"]
+        self.num_envs = self.cfg["env"]["num_envs"]
+        self.num_features = self.cfg["env"]["num_features"]
+        self.num_apples = self.cfg["env"]["num_apples"]
+        self.apple_prob = self.cfg["env"]["num_prob"]
+        self.fire_prob = self.cfg["env"]["num_prob"]
 
         self.boards = torch.zeros(self.num_envs, self.num_features, self.size, self.size, device=self.device)
         self.player_layer = self.boards.view(self.num_envs, self.num_features, self.size, self.size)[:,0, ...]

@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon May 22 20:26:04 2023
-
-@author: MiloPC
-"""
-
 import torch
 import pygame
 import pygame.freetype
@@ -96,7 +89,8 @@ class simplEnv():
             self.episode_time[:] = self.episode_time[:] + 1
             
     def get_rewards(self):    
-        self.rewards = -1*torch.ones(self.num_envs,)    
+        # self.rewards = -1*torch.ones(self.num_envs,)    
+        self.rewards = (torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0)*1.0
                 
     def get_reset_idx(self):
         goal_reset = torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0
@@ -125,7 +119,7 @@ class simplEnv():
         with torch.no_grad():
             S1 = self.buffer.s1*2./(self.siz-1.)-1.
             A1 = self.buffer.a
-            R1 = self.buffer.r*(1.0 - 1.0*self.buffer.d)
+            R1 = self.buffer.r
             S2 = self.buffer.s2*2./(self.siz-1.)-1.
         
         return S1, A1, R1, S2
