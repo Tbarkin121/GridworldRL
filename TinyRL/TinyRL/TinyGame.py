@@ -1,21 +1,14 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon May 22 20:26:04 2023
-
-@author: MiloPC
-"""
-
 import torch
 import pygame
 import pygame.freetype
 
 class Buffer():
   def __init__(self,buffer_len,num_actions):
-    self.s1= torch.zeros([buffer_len,4])
-    self.a= torch.randint(0,num_actions,[buffer_len,])
-    self.r= torch.zeros([buffer_len,])
-    self.s2 = torch.zeros([buffer_len,4])
-    self.d = torch.zeros([buffer_len,])==1
+    self.s1= torch.zeros([buffer_len,4]) #state 1
+    self.a= torch.randint(0,num_actions,[buffer_len,]) 
+    self.r= torch.zeros([buffer_len,]) #reward maybe?
+    self.s2 = torch.zeros([buffer_len,4]) #state 2
+    self.d = torch.zeros([buffer_len,])==1 #not sure
 
 
 class simplEnv():
@@ -24,30 +17,35 @@ class simplEnv():
         self.num_envs = num_envs
         self.siz = siz
         self.buffer_len = buffer_len
-        self.action_table =  torch.tensor([[-1, 1],
-                                            [0, 1],
-                                            [1, 1],
+        # self.action_table =  torch.tensor([[-1, 1], #remove
+        #                                     [0, 1],
+        #                                     [1, 1], #remove
+        #                                     [-1, 0],
+        #                                     [0, 0],
+        #                                     [1, 0],
+        #                                     [-1, -1],#remove
+        #                                     [0, -1],
+        #                                     [1, -1]])*1.0 #remove
+        
+        self.action_table =  torch.tensor([[0, 1],
                                             [-1, 0],
-                                            [0, 0],
                                             [1, 0],
-                                            [-1, -1],
-                                            [0, -1],
-                                            [1, -1]])*1.0
+                                            [0, -1]])*1.0 #remove
         
                 
-        self.num_actions = self.action_table.shape[0]
-        self.states = torch.zeros([self.num_envs,4])
+        self.num_actions = self.action_table.shape[0] #I guess this is the first entry in returned shape. Must be 9x1 
+        self.states = torch.zeros([self.num_envs,4]) #4 states present, forget what they are here to be honest
         self.max_episode_length = 100
-        self.episode_time = torch.zeros([self.num_envs,])
-        self.get_reset_idx()
-        self.reset_env()
-        self.buffer = Buffer(self.buffer_len,self.num_actions)
-        self.fill()
+        self.episode_time = torch.zeros([self.num_envs,]) #I dont get this line. I guess 1 time interation for each environment
+        self.get_reset_idx() #declairng this and defining it later?
+        self.reset_env() #same as above
+        self.buffer = Buffer(self.buffer_len,self.num_actions) #creates a buffer with desired atributes?
+        self.fill() #define later check it out
         
         # Pygames Stuff
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
-        self.window = None      
+        self.window = None     #no window might be a problem here 
         self.clock = None     
         if(self.render_mode == "pygame"):
             pygame.init()
@@ -57,12 +55,12 @@ class simplEnv():
             self.window_size = window_size
             self.window = pygame.display.set_mode((self.window_size, self.window_size))        
             self.clock = pygame.time.Clock()
-            self.action_ascii = ['↙','↓','↘','←','♬','→','↖','↑','↗']
+            self.action_ascii = ['↓','←','→','↑']
 
 
 
         
-    def fill(self):
+    def fill(self): # I think this might be actual game loop?
         num = torch.ceil(torch.tensor([self.buffer_len/self.num_envs])).int()
         for i in range(num):
             actions = torch.randint(0,self.num_actions,[self.num_envs,])
@@ -96,7 +94,8 @@ class simplEnv():
             self.episode_time[:] = self.episode_time[:] + 1
             
     def get_rewards(self):    
-        self.rewards = -1*torch.ones(self.num_envs,)    
+        # self.rewards = -1*torch.ones(self.num_envs,)    
+        self.rewards = (torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0)*1.0
                 
     def get_reset_idx(self):
         goal_reset = torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0
@@ -125,7 +124,7 @@ class simplEnv():
         with torch.no_grad():
             S1 = self.buffer.s1*2./(self.siz-1.)-1.
             A1 = self.buffer.a
-            R1 = self.buffer.r*(1.0 - 1.0*self.buffer.d)
+            R1 = self.buffer.r
             S2 = self.buffer.s2*2./(self.siz-1.)-1.
         
         return S1, A1, R1, S2
@@ -168,6 +167,9 @@ class simplEnv():
         # Draw Goal
 
         _goal_location = self.states[env_id, 2:4].detach().cpu().numpy()
+        
+        print(pix_square_size,_goal_location,pix_square_size,pix_square_size)
+        
         pygame.draw.rect(
             canvas,
             (0, 255, 0),
