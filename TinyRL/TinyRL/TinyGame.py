@@ -34,12 +34,17 @@ class simplEnv():
         
                 
         self.num_actions = self.action_table.shape[0] #I guess this is the first entry in returned shape. Must be 9x1 
-        self.states = torch.zeros([self.num_envs,4]) #4 states present, forget what they are here to be honest
+        self.states = torch.zeros([self.num_envs,4]) #So just initializing all states to zero
         self.max_episode_length = 100
-        self.episode_time = torch.zeros([self.num_envs,]) #I dont get this line. I guess 1 time interation for each environment
-        self.get_reset_idx() #declairng this and defining it later?
+        self.episode_time = torch.zeros([self.num_envs,]) #
+        self.get_reset_idx() #will reset everything as all distnaces are zero initially since all states are zero
         self.reset_env() #same as above
-        self.buffer = Buffer(self.buffer_len,self.num_actions) #creates a buffer with desired atributes?
+        self.buffer = Buffer(self.buffer_len,self.num_actions) #create a buffer with params for buffer. 
+        #Then we just fill it with random actions and run the update function with those random actions num times
+        #the buffer is actually holding state transitions. Will have like the last ten states
+        #stored as A state and B state. So the before and after. Actually actions to. S1 state -> action -> s2 state->r eward all in the buffer
+        #each one of those columns is the buffer in length of rows
+        #roll command cycles the buffer
         self.fill() #define later check it out
         
         # Pygames Stuff
@@ -69,20 +74,28 @@ class simplEnv():
 
     def update(self,actions):
         with torch.no_grad():
-            self.buffer.s1 = self.buffer.s1.roll(self.num_envs,0)
-            self.buffer.s1[0:self.num_envs,] = self.states
-            self.buffer.a = self.buffer.a.roll(self.num_envs,0)
+            self.buffer.s1 = self.buffer.s1.roll(self.num_envs,0) #torch functions, buffer roll just cycles the buffer. steady state system
+            self.buffer.s1[0:self.num_envs,] = self.states #this overwrites the top thing where the previous last step was rolled to
+            self.buffer.a = self.buffer.a.roll(self.num_envs,0) #same repeeats for actions
             self.buffer.a[0:self.num_envs,] = actions
+            
+            
+            
             
             acts = torch.matmul(torch.nn.functional.one_hot(actions, num_classes = self.num_actions)*1.0, self.action_table)
             
+        
+     
             self.states =  self.states + torch.concat([torch.reshape(acts,[self.num_envs,2]),torch.zeros([self.num_envs,2])],1)
             self.states = torch.clip(self.states,0,self.siz-1)
+            
+            
+            torch.sum((self.states[:,0:2] - self.states[:,2:4])**2,dim=1) == 0
             
             self.get_reset_idx()
             self.get_rewards()
             
-            self.buffer.d = self.buffer.d.roll(self.num_envs,0)
+            self.buffer.d = self.buffer.d.roll(self.num_envs,0) #I don't know what d is
             self.buffer.d[0:self.num_envs,] = self.reset_idx
             self.buffer.r = self.buffer.r.roll(self.num_envs,0)
             self.buffer.r[0:self.num_envs,] = self.rewards
@@ -96,15 +109,18 @@ class simplEnv():
     def get_rewards(self):    
         # self.rewards = -1*torch.ones(self.num_envs,)    
         self.rewards = (torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0)*1.0
+            #if rewards gotten then add apple rewards
                 
     def get_reset_idx(self):
-        goal_reset = torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0
+        goal_reset = torch.sum((self.states[:,0:2] - self.states[:,2:4])**2,dim=1) == 0 #10k rows, eucldian distance formula. Vector of booleans
         timer_reset = self.episode_time > self.max_episode_length
         self.reset_idx = goal_reset | timer_reset
 
     def reset_env(self):
+        # n_apples = 2
         num_resets = torch.sum(self.reset_idx)
-        self.states[self.reset_idx,:] = torch.randint(0,self.siz,[num_resets,4])*1.0  
+        # self.states[self.reset_idx,:] = torch.concatenate([torch.randint(0,self.siz,[num_resets,4+2*n_apples])*1.0,torch.ones(num_resets,n_apples)],dim=1)
+        self.states[self.reset_idx,:] = torch.randint(0,self.siz,[num_resets,4])*1.0  #going to switch to boolean one here meaning apples is still active
         self.episode_time[self.reset_idx] = torch.zeros([num_resets,])
     
     def render(self, env_id, action_map=None):
