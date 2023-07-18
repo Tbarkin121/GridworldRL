@@ -1,6 +1,7 @@
 import torch
 import pygame
 import pygame.freetype
+import numpy as np
 
 class Buffer():
   def __init__(self,buffer_len,num_actions):
@@ -17,11 +18,41 @@ class simplEnv():
         self.num_envs = num_envs
         self.siz = siz
         self.buffer_len = buffer_len
-        self.action_table =  torch.tensor( [[0, 1],
+        # self.action_table =  torch.tensor( [[0, 1],
+        #                                     [-1, 0],
+        #                                     [0, 0],
+        #                                     [1, 0],
+        #                                     [0, -1]])*1.0        
+        self.action_table =  torch.tensor([[-1, 1],
+                                            [0, 1],
+                                            [1, 1],
                                             [-1, 0],
                                             [0, 0],
                                             [1, 0],
-                                            [0, -1]])*1.0
+                                            [-1, -1],
+                                            [0, -1],
+                                            [1, -1]])*1.0
+        
+        # self.reward_table =  torch.tensor([-1.414,
+        #                                     -1,
+        #                                     -1.414,
+        #                                     -1,
+        #                                     -1,
+        #                                     -1,
+        #                                     -1.414,
+        #                                     -1,
+        #                                     -1.414])
+        
+        self.reward_table =  torch.tensor([ -1.0,
+                                            -1.0,
+                                            -1.0,
+                                            -1.0,
+                                            -1.0,
+                                            -1.0,
+                                            -1.0,
+                                            -1.0,
+                                            -1.0])
+        
         
                 
         self.num_actions = self.action_table.shape[0]
@@ -46,8 +77,17 @@ class simplEnv():
             self.window_size = window_size
             self.window = pygame.display.set_mode((self.window_size, self.window_size))        
             self.clock = pygame.time.Clock()
-            # self.action_ascii = ['↙','↓','↘','←','♬','→','↖','↑','↗']
-            self.action_ascii = ['→','←','x','↑','↓']
+            self.action_ascii = ['←↓','↓','→↓','←','X','→','←↑','↑','→↑']
+            self.action_color = [(0, 0, 128),
+                                 (0, 128, 128),
+                                 (0, 255, 128),
+                                 (128, 0, 128),
+                                 (128, 128, 128),
+                                 (128, 255, 128),
+                                 (255, 0, 128),
+                                 (255, 128, 128),
+                                 (255, 255, 128)]
+            # self.action_ascii = ['→','←','x','↑','↓']
 
 
 
@@ -68,11 +108,12 @@ class simplEnv():
             
             acts = torch.matmul(torch.nn.functional.one_hot(actions, num_classes = self.num_actions)*1.0, self.action_table)
             
+            
             self.states =  self.states + torch.concat([torch.reshape(acts,[self.num_envs,2]),torch.zeros([self.num_envs,2])],1)
             self.states = torch.clip(self.states,0,self.siz-1)
             
             self.get_reset_idx()
-            self.get_rewards()
+            self.get_rewards(actions)
             
             self.buffer.d = self.buffer.d.roll(self.num_envs,0)
             self.buffer.d[0:self.num_envs,] = self.reset_idx
@@ -81,23 +122,29 @@ class simplEnv():
             self.buffer.s2 = self.buffer.s2.roll(self.num_envs,0)
             self.buffer.s2[0:self.num_envs,] = self.states
             
-            print('------------')
-            print('s1 : ')
-            print(self.buffer.s1[0])
-            print('a : ')
-            print(self.buffer.a[0])
-            print('s2 : ')
-            print(self.buffer.s2[0])
-            print('rewards : ')
-            print(self.rewards[0])
+            # print('------------')
+            # print('a : ')
+            # print(self.buffer.a[0::2])
+            # print('s1 : ')
+            # print(self.buffer.s1[0::2])
+            # print('s2 : ')
+            # print(self.buffer.s2[0::2])
+            # print('r : ')
+            # print(self.buffer.r[0::2])
+            # print('d : ')
+            # print(self.buffer.d[0::2])
+            # print('rewards : ')
+            # print(self.rewards[0::2])
 
             
             self.reset_env()
             self.episode_time[:] = self.episode_time[:] + 1
             
-    def get_rewards(self):    
+    def get_rewards(self, actions):    
+        rews = torch.matmul(torch.nn.functional.one_hot(actions, num_classes = self.num_actions)*1.0, self.reward_table)
         # self.rewards = -1*torch.ones(self.num_envs,)    
-        self.rewards = (torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0)*1.0
+        on_goal_bool = (torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0)
+        self.rewards = torch.where(on_goal_bool, 1.0, rews)
                 
     def get_reset_idx(self):
         goal_reset = torch.sum((self.states[:,0:2] - self.states[:,2:])**2,dim=1) == 0
@@ -223,6 +270,26 @@ class simplEnv():
                 txtsurf = self.font.render(action_img, True, (0,0,0))
                 # self.window.blit(txtsurf,(self.window_size - txtsurf.get_width() // 2, self.window_size - txtsurf.get_height() // 2))
                 self.window.blit(txtsurf,(pix_square_size*x+offset, pix_square_size*y+offset))
+        
+        canvas = pygame.Surface((self.window_size, self.window_size))
+        canvas.set_alpha(128)
+        for x in range(self.board_size):
+            for y in range(self.board_size):
+                
+                color = self.action_color[action_map[x,y]]
+                pygame.draw.rect(
+                    canvas,
+                    color,
+                    pygame.Rect(
+                        pix_square_size * np.array([x,y]),
+                        (pix_square_size, pix_square_size),
+                    ),
+                )
+        self.window.blit(canvas, canvas.get_rect())
+                
+                
+                
+
 
 
 

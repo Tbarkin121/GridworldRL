@@ -3,9 +3,7 @@ name: GridWorld
 
 env:
   device: 'cuda'
-  board_size: 51  # Square Grid
-
-
+  board_size: 9  # Square Grid
 
 train_param:
   num_envs: 10000
