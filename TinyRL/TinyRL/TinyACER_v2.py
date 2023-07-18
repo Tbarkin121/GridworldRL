@@ -6,95 +6,60 @@ Created on Mon May 22 20:06:31 2023
 """
 
 import torch
-import torch.nn as nn
-from torch import optim
 import TinyGame
 
-buffer_len = 100000;
-num_envs = 10000
+buffer_len = 1000;
+num_envs = 1000
 siz = 9
-gamma = 0.99
+gamma = 0.9
 ent_coef = 0.0
 vf_coef = 0.5
 num_epochs = 1000
 num_q_holds = 1
 num_inner_steps = 1
-torch.set_default_device('cpu')
+torch.set_default_device('cuda')
 
 #%%
 # Define model
 class Policy(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        # define actor and critic networks
-        
-        n_features = 4
-        n_actions = 9
-        
-        critic_layers = [
-                        nn.Linear(n_features, 32),
-                        nn.ReLU(),
-                        nn.Linear(32, 32),
-                        nn.ReLU(),
-                        nn.Linear(32, 1),  # estimate V(s)
-                    ]
-                    
-        actor_layers = [
-                        nn.Linear(n_features, 32),
-                        nn.ReLU(),
-                        nn.Linear(32, 32),
-                        nn.ReLU(),
-                        nn.Linear(
-                            32, n_actions
-                        ), 
-                        nn.Softmax(),
-                    ]
-        
-        
-        self.critic = nn.Sequential(*critic_layers)
-        self.actor = nn.Sequential(*actor_layers)
-        
-        
-        # self.linear_relu_stack = torch.nn.Sequential(
-        #     torch.nn.Linear(4, 128),
-        #     torch.nn.LeakyReLU(),
-        #     torch.nn.Linear(128, 128),
-        #     torch.nn.LeakyReLU()
-        # )
-        # self.linear_head1 = torch.nn.Sequential(
-        #     torch.nn.Linear(128, 1)
-        # )
-        # self.linear_head2 = torch.nn.Sequential(
-        #     torch.nn.Linear(128, 9)
-        # )
+        self.shared_linear = torch.nn.Sequential(
+            torch.nn.Linear(4, 128),
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(128, 128),
+            torch.nn.LeakyReLU()
+        )
+        self.value_head = torch.nn.Sequential(
+            torch.nn.Linear(128, 1)
+        )
+        self.actor_head = torch.nn.Sequential(
+            torch.nn.Linear(128, 5)
+        )
 
 
     def forward(self, x):
-        # out0 = self.linear_relu_stack(x)
-        # out1 = self.linear_head1(out0)
-        # out2 = self.linear_head2(out0)
-        # out2 = torch.nn.functional.softmax(out2, 1)
-        
-        state_values = self.critic(x)  # shape: [n_envs,]
-        action_logits_vec = self.actor(x)  # shape: [n_envs, n_actions]
-        return (state_values, action_logits_vec)
+        x = self.shared_linear(x)
+        state_values = self.value_head(x)
+        state_values = self.actor_head(x)
+        action_prob = torch.nn.functional.softmax(action_prob, 1)
 
         # out1 = torch.nn.functional.relu(out1)
 
-        return out1, out2
+        return state_values, state_values
     
 #%%
-a = torch.rand([3,4])
+model = Policy()
+rand_obs = 2*torch.rand((10,4))-1
+
+model_out = model(rand_obs)
+print(model_out)
+#%%
 PolicyNet1 = Policy()
-
-critic_optim = optim.Adam(PolicyNet1.critic.parameters(), lr=1e-3)
-actor_optim = optim.Adam(PolicyNet1.actor.parameters(), lr=1e-3)
-        
-# optimizer_Policy = torch.optim.Adam(PolicyNet1.parameters(), lr=1e-3)
-
 PolicyNet2 = Policy()
 PolicyNet2.eval()
 
+optimizer_Policy = torch.optim.Adam(PolicyNet1.parameters(), lr=1e-3)
 mse_loss = torch.nn.MSELoss()
 
 #%%
@@ -112,41 +77,41 @@ for epoch in range(num_epochs):
     
     for i in range(num_q_holds):
         obs, actions, reward, obs_prime = env.get_SARS() 
-        
         for _ in range(num_inner_steps):
-            mask = 1-torch.reshape(reward,[-1,1])
+            optimizer_Policy.zero_grad()
             [vals,probs] = PolicyNet1(obs)
-            returns = mask*gamma*PolicyNet2(obs_prime)[0] + torch.reshape(reward,[-1,1])
-            td_error = returns - vals
+            
+
+            returns = gamma*PolicyNet2(obs_prime)[0] + torch.reshape(reward,[-1,1])
             
             advantage = returns - vals
-            
-            # calculate the loss of the minibatch for actor and critic
-            critic_loss = advantage.pow(2).mean()
-        
             prob_act = probs.gather(1, actions.reshape([-1,1]))
             log_probs = torch.log(prob_act)
             
-            actor_loss = -(advantage.detach() * log_probs).mean()
+            value_loss = torch.nn.functional.mse_loss(returns.squeeze(),vals.squeeze())
             
+            # entropy_loss = torch.mean(-log_probs)
+            entropy_loss = -torch.mean(prob_act*log_probs)
             
+            # policy_loss = -torch.mean(log_probs*advantage)
+            policy_loss = torch.mean(-log_probs*advantage)
             
-            critic_optim.zero_grad()
-            critic_loss.backward()
-            critic_optim.step()
+            loss = policy_loss + ent_coef*entropy_loss + vf_coef*value_loss
             
+           
+            loss.backward()
             
-            actor_optim.zero_grad()
-            actor_loss.backward()
-            actor_optim.step()
+            # torch.nn.utils.clip_grad_norm_(PolicyNet1.parameters(), 0.5)
+            optimizer_Policy.step()
+            
    
-        # next_actions = torch.distributions.Categorical(probs=probs[:env.num_envs]).sample()
-        action_pd = torch.distributions.Categorical(logits=probs[:env.num_envs])
-        next_actions = action_pd.sample()
-        # action_log_probs = action_pd.log_prob(actions)
-        # entropy = action_pd.entropy()
+        next_actions = torch.distributions.categorical.Categorical(probs=probs[:env.num_envs]).sample()
+        # next_actions = torch.max(probs,dim=1)[1][:env.num_envs]
+        # next_actions[epsilon_idx] = rand_actions
         
         env.update(next_actions)
+        
+        
         
         
     goal_coord = torch.unsqueeze(env.states[0,2:4],0)
@@ -169,7 +134,7 @@ import time
 
 view_len = 1000
 
-env_render = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode="pygame", window_size = 512, font_size = 24)
+env_render = TinyGame.simplEnv(num_envs,siz,buffer_len, render_mode="pygame", window_size = 1024, font_size = 24)
 env_view_id = 0
 for i in range(view_len):
 

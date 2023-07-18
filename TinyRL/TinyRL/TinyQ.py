@@ -1,6 +1,8 @@
 import torch
 import TinyGame
 import yaml
+import os
+
 
 # Define model
 class Q_nn(torch.nn.Module):
@@ -9,7 +11,7 @@ class Q_nn(torch.nn.Module):
         self.linear_relu_stack = torch.nn.Sequential(
             torch.nn.Linear(4, 128),
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(128, 9),
+            torch.nn.Linear(128, 5),
 
            
         )

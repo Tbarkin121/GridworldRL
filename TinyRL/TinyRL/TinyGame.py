@@ -17,15 +17,11 @@ class simplEnv():
         self.num_envs = num_envs
         self.siz = siz
         self.buffer_len = buffer_len
-        self.action_table =  torch.tensor([[-1, 1],
-                                            [0, 1],
-                                            [1, 1],
+        self.action_table =  torch.tensor( [[0, 1],
                                             [-1, 0],
                                             [0, 0],
                                             [1, 0],
-                                            [-1, -1],
-                                            [0, -1],
-                                            [1, -1]])*1.0
+                                            [0, -1]])*1.0
         
                 
         self.num_actions = self.action_table.shape[0]
@@ -50,7 +46,8 @@ class simplEnv():
             self.window_size = window_size
             self.window = pygame.display.set_mode((self.window_size, self.window_size))        
             self.clock = pygame.time.Clock()
-            self.action_ascii = ['↙','↓','↘','←','♬','→','↖','↑','↗']
+            # self.action_ascii = ['↙','↓','↘','←','♬','→','↖','↑','↗']
+            self.action_ascii = ['→','←','x','↑','↓']
 
 
 
@@ -84,6 +81,16 @@ class simplEnv():
             self.buffer.s2 = self.buffer.s2.roll(self.num_envs,0)
             self.buffer.s2[0:self.num_envs,] = self.states
             
+            print('------------')
+            print('s1 : ')
+            print(self.buffer.s1[0])
+            print('a : ')
+            print(self.buffer.a[0])
+            print('s2 : ')
+            print(self.buffer.s2[0])
+            print('rewards : ')
+            print(self.rewards[0])
+
             
             self.reset_env()
             self.episode_time[:] = self.episode_time[:] + 1
