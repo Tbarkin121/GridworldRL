@@ -3,7 +3,7 @@ name: GridWorld
 
 env:
   device: 'cuda'
-  board_size: 15  # Square Grid
+  board_size: 21  # Square Grid
 
 
 

@@ -7,9 +7,9 @@ class Q_nn(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.linear_relu_stack = torch.nn.Sequential(
-            torch.nn.Linear(4, 128),
+            torch.nn.Linear(10, 128), #changing 4 to ten
             torch.nn.LeakyReLU(),
-            torch.nn.Linear(128, 4),
+            torch.nn.Linear(128, 4), #idk why
 
            
         )
@@ -85,62 +85,62 @@ class Training():
             
             
             goal_coord = torch.unsqueeze(self.env_eval.states[self.env_view_id,2:4],0)
-            sample_states = torch.concat([grid_coords,goal_coord*torch.ones([self.env_eval.siz**2,1])],1)
-            sample_obs = sample_states*2./(self.env_train.siz-1.)-1.
-            Qvals = self.net1(sample_obs)
-            MaxQ = torch.max(Qvals,dim=1)
-            action_map = MaxQ[1].reshape(self.env_train.siz,self.env_train.siz).cpu().numpy()
-            self.env_train.render(0, action_map)
+            # sample_states = torch.concat([grid_coords,goal_coord*torch.ones([self.env_eval.siz**2,1])],1)
+            # sample_obs = sample_states*2./(self.env_train.siz-1.)-1.
+            # Qvals = self.net1(sample_obs)
+            # MaxQ = torch.max(Qvals,dim=1)
+            # action_map = MaxQ[1].reshape(self.env_train.siz,self.env_train.siz).cpu().numpy()
+            self.env_train.render(0)
             
             # print(action_world)
             
             print(epoch,loss.detach().cpu().numpy(),torch.mean(maxQ[0]).detach().cpu().numpy())
 
-    def test(self, test_len):
-        import time
+    # def test(self, test_len):
+    #     import time
         
-        a = torch.linspace(0,self.env_eval.siz-1,self.env_eval.siz)
-        grid = torch.meshgrid(a,a)
-        grid_coords = torch.concat([grid[0].reshape([-1,1]),grid[1].reshape([-1,1])],1)
-        for i in range(test_len):
+    #     a = torch.linspace(0,self.env_eval.siz-1,self.env_eval.siz)
+    #     grid = torch.meshgrid(a,a)
+    #     grid_coords = torch.concat([grid[0].reshape([-1,1]),grid[1].reshape([-1,1])],1)
+    #     for i in range(test_len):
             
-            goal_coord = torch.unsqueeze(self.env_eval.states[self.env_view_id,2:4],0)
-            sample_states = torch.concat([grid_coords,goal_coord*torch.ones([self.env_eval.siz**2,1])],1)
-            sample_obs = sample_states*2./(self.env_eval.siz-1.)-1.
-            Qvals = self.net1(sample_obs)
-            MaxQ = torch.max(Qvals,dim=1)
+    #         goal_coord = torch.unsqueeze(self.env_eval.states[self.env_view_id,2:4],0)
+    #         sample_states = torch.concat([grid_coords,goal_coord*torch.ones([self.env_eval.siz**2,1])],1)
+    #         sample_obs = sample_states*2./(self.env_eval.siz-1.)-1.
+    #         Qvals = self.net1(sample_obs)
+    #         MaxQ = torch.max(Qvals,dim=1)
             
-            action_map = MaxQ[1].reshape(self.env_eval.siz,self.env_eval.siz).cpu().numpy()
-            self.env_eval.render(self.env_view_id, action_map)
-            
-
-            obs = self.env_eval.states*2./(self.env_eval.siz-1.)-1.
-            Q_vals = self.net1(obs)
-            
-            # print(self.env_eval.states[0])
-            
-            maxQ = torch.max(Q_vals,dim=1)
-            actions = maxQ[1]
-
-            # print('-----')
-            # print(self.env_eval.states[env_view_id,...])
-            # print('numpad action : {}'.format(actions[env_view_id].detach().cpu().numpy()+1))
-            self.env_eval.update(actions)
-            # print(self.env_eval.states[env_view_id,...])
-            
-            # print('.......')
-            # print(obs[0,...])
-            # print(actions)
-            # print()
+    #         action_map = MaxQ[1].reshape(self.env_eval.siz,self.env_eval.siz).cpu().numpy()
+    #         self.env_eval.render(self.env_view_id, action_map)
             
 
-            # time.sleep(1)
-        ""
-            # print(actions[0])
+    #         obs = self.env_eval.states*2./(self.env_eval.siz-1.)-1.
+    #         Q_vals = self.net1(obs)
+            
+    #         # print(self.env_eval.states[0])
+            
+    #         maxQ = torch.max(Q_vals,dim=1)
+    #         actions = maxQ[1]
 
-        # self.env_eval.close()
+    #         # print('-----')
+    #         # print(self.env_eval.states[env_view_id,...])
+    #         # print('numpad action : {}'.format(actions[env_view_id].detach().cpu().numpy()+1))
+    #         self.env_eval.update(actions)
+    #         # print(self.env_eval.states[env_view_id,...])
+            
+    #         # print('.......')
+    #         # print(obs[0,...])
+    #         # print(actions)
+    #         # print()
+            
+
+    #         # time.sleep(1)
+    #     ""
+    #         # print(actions[0])
+
+    #     # self.env_eval.close()
     
 grid_world = Training()
 grid_world.train()
-grid_world.test(100)
+# grid_world.test(100)
 
